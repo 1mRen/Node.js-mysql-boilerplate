@@ -216,7 +216,7 @@ async function getRefreshToken(token){
 }
 
 async function hash(password){
-  return await bcrpyt.has(password, 10);
+  return await bcrypt.hash(password, 10);
 }
 
 function generateJwtToken(account){
@@ -234,7 +234,7 @@ function generateRefreshToken(account, ipAddress) {
   });
 }
 
-function randonTokenString(){
+function randomTokenString(){
   return crypto.randomBytes(40).toString('hex');
 }
 
@@ -243,9 +243,29 @@ function basicDetails(account){
   return { id, email, firstName, lastName, role, created, updated, isVerified };
 }
 
+async function sendVerificationEmail(account, origin) {
+  let message;
+  if (origin) {
+      const verifyUrl = `${origin}/account/verify-email?token=${account.verificationToken}`;
+      message = `<p>Please click the below link to verify your email address:</p>
+                 <p><a href="${verifyUrl}">${verifyUrl}</a></p>`;
+  } else {
+      message = `<p>Please use the below token to verify your email address with the <code>/account/verify-email</code> api route:</p>
+                 <p><code>${account.verificationToken}</code></p>`;
+  }
+
+  await sendEmail({
+      to: account.email,
+      subject: 'Sign-up Verification API - Verify Email',
+      html: `<h4>Verify Email</h4>
+             <p>Thanks for registering!</p>
+             ${message}`
+  });
+}
+
 async function sendAlreadyRegisteredEmail(email, origin){
   let message;
-  if (orign){
+  if (origin){
     message = `
     <p>If you don't know your password please visit the <a href="${origin}/account/forgot-passowrd">forgot password</a> page.</p>`;
   } else {
