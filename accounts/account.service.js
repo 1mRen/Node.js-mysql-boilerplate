@@ -12,7 +12,7 @@ module.exports = {
   refreshToken,
   revokeToken,
   register,
-  verifyemail,
+  verifyEmail,
   forgotPassword,
   validateResetToken,
   resetPassword,
@@ -98,6 +98,31 @@ async function register(params, origin){
 
   // send email
   await sendVerificationEmail(account, origin);
+}
+
+async function verifyEmail({ token }){
+  const account = await db.Account.findOne({ where: { verificationToken: token} });
+
+  if (!account) throw 'Verification failed, token is invalid or expired';
+
+  account.verified = Date.now();
+  account.verificationToken = null;
+  await account.save()
+}
+
+async function forgotPassword({ email }, origin){
+  const account = await db.Account.findOne({ where: { email } });
+
+  //always return ok response to prevent email enumeration
+  if (!account) return;
+
+  //create reset token that expires after 24 hours
+  account.resetToken = randomTokenString();
+  account.resetTokenExpiry = new Date(Date.now() + 24*60*60*1000); // 1 hour
+  await account.save();
+
+  //send email
+  await sendPasswordResetEmail(account, origin);
 }
 
 async function validateResetToken ({ token }){
