@@ -87,8 +87,10 @@ function registerSchema(req, res, next) {
       confirmPassword: Joi.string().valid(Joi.ref('password')).required(),
       acceptTerms: Joi.boolean().valid(true).required()
   });
-  validateRequest(req, next, schema);
+
+  validateRequest(req, next, schema);  // Ensure schema is passed correctly
 }
+
 
 function register(req, res, next) {
   accountService.register(req.body, req.get('origin'))

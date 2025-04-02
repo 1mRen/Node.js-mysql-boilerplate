@@ -1,34 +1,43 @@
-const jwt = require('express-jwt');
-const { secret } = require('config.json');
-const db = require('_helpers/db');
+const { expressjwt: jwt } = require('express-jwt');
+const { secret } = require('../config.json'); // Fix config path
+const db = require('../_helpers/db'); // Fix db path
 
 module.exports = authorize;
 
-function authorize(roles = []){
-  // roles param can be a single role string (e.g. Role.User or 'User')
-  // or an array of roles (e.g. [Role.Admin, Role.User] or ['Admin', 'User'])
-
+function authorize(roles = []) {
   if (typeof roles === 'string') {
     roles = [roles];
   }
 
-  return[
-    // authenticate JWT token and attach user to request object (req.user)
-    jwt({ secret, algorithms: ['HS256']}),
+  return [
+    // Authenticate JWT token and attach user to request object (req.auth)
+    jwt({ secret, algorithms: ['HS256'], requestProperty: 'auth' }),
 
-    // authorize based on user role
+    // Debugging: Log token data
+    (req, res, next) => {
+      console.log('Decoded User:', req.auth); // Should print valid token payload
+      if (!req.auth) {
+        return res.status(401).json({ message: 'JWT token missing or invalid' });
+      }
+      next();
+    },
+
+    // Authorize user role
     async (req, res, next) => {
-      const account = await db.Account.findByPk(req.user.id);
+      console.log('Checking account for:', req.auth.id);
+
+      const account = await db.Account.findByPk(req.auth.id);
+      console.log('Account found:', account?.dataValues || 'Not found');
 
       if (!account || (roles.length && !roles.includes(account.role))) {
-        // account no longer exist or role not authorized
-        return res.status(401).json({ message: 'Unauthorized'});
+        return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      // authentication and authorization successful
-      req.user.role = account.role;
+      req.auth.role = account.role;
       const refreshTokens = await account.getRefreshTokens();
-      req.user.ownsToken = token => !!refreshTokens.find(x => x.token === token);
+      req.auth.ownsToken = token => !!refreshTokens.find(x => x.token === token);
+
+      req.user = req.auth; // Ensure `req.user` is available
       next();
     }
   ];

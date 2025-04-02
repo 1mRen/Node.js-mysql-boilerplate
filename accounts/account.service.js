@@ -26,7 +26,7 @@ module.exports = {
 async function authenticate({ email, password, ipAddress}){
   const account = await db.Account.scope('withHash').findOne({where: {email}});
 
-  if (!account || !account.isVerified || !(await bcrypt.compare(password, account,passwordHash))){
+  if (!account || !account.isVerified || !(await bcrypt.compare(password, account.passwordHash))){
     throw 'Email or password is incorrect';
   }
 
@@ -118,7 +118,7 @@ async function forgotPassword({ email }, origin){
 
   //create reset token that expires after 24 hours
   account.resetToken = randomTokenString();
-  account.resetTokenExpiry = new Date(Date.now() + 24*60*60*1000); // 1 hour
+  account.resetTokenExpiry = new Date(Date.now() + 24*60*60*1000); // 24 hours
   await account.save();
 
   //send email
@@ -149,7 +149,7 @@ async function resetPassword({ token, password}){
 
 async function getAll(){
   const accounts = await db.Account.findAll();
-  return accounts.mao(x => basicDetails(x));
+  return accounts.map(x => basicDetails(x));
 }
 
 async function getById(id){
@@ -204,7 +204,7 @@ async function _delete(id){
 // helper functions
 
 async function getAccount(id){
-  const acocunt = await db.Account.findByPk(id);
+  const account = await db.Account.findByPk(id);
   if(!account) throw 'Account not found';
   return account;
 }
@@ -216,7 +216,7 @@ async function getRefreshToken(token){
 }
 
 async function hash(password){
-  return await bcrpyt.has(password, 10);
+  return await bcrypt.hash(password, 10);
 }
 
 function generateJwtToken(account){
@@ -234,7 +234,7 @@ function generateRefreshToken(account, ipAddress) {
   });
 }
 
-function randonTokenString(){
+function randomTokenString(){
   return crypto.randomBytes(40).toString('hex');
 }
 
@@ -243,9 +243,29 @@ function basicDetails(account){
   return { id, email, firstName, lastName, role, created, updated, isVerified };
 }
 
+async function sendVerificationEmail(account, origin) {
+  let message;
+  if (origin) {
+      const verifyUrl = `${origin}/account/verify-email?token=${account.verificationToken}`;
+      message = `<p>Please click the below link to verify your email address:</p>
+                 <p><a href="${verifyUrl}">${verifyUrl}</a></p>`;
+  } else {
+      message = `<p>Please use the below token to verify your email address with the <code>/account/verify-email</code> api route:</p>
+                 <p><code>${account.verificationToken}</code></p>`;
+  }
+
+  await sendEmail({
+      to: account.email,
+      subject: 'Sign-up Verification API - Verify Email',
+      html: `<h4>Verify Email</h4>
+             <p>Thanks for registering!</p>
+             ${message}`
+  });
+}
+
 async function sendAlreadyRegisteredEmail(email, origin){
   let message;
-  if (orign){
+  if (origin){
     message = `
     <p>If you don't know your password please visit the <a href="${origin}/account/forgot-passowrd">forgot password</a> page.</p>`;
   } else {
