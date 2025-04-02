@@ -26,7 +26,7 @@ module.exports = {
 async function authenticate({ email, password, ipAddress}){
   const account = await db.Account.scope('withHash').findOne({where: {email}});
 
-  if (!account || !account.isVerified || !(await bcrypt.compare(password, account,passwordHash))){
+  if (!account || !account.isVerified || !(await bcrypt.compare(password, account.passwordHash))){
     throw 'Email or password is incorrect';
   }
 
@@ -118,7 +118,7 @@ async function forgotPassword({ email }, origin){
 
   //create reset token that expires after 24 hours
   account.resetToken = randomTokenString();
-  account.resetTokenExpiry = new Date(Date.now() + 24*60*60*1000); // 1 hour
+  account.resetTokenExpiry = new Date(Date.now() + 24*60*60*1000); // 24 hours
   await account.save();
 
   //send email
@@ -149,7 +149,7 @@ async function resetPassword({ token, password}){
 
 async function getAll(){
   const accounts = await db.Account.findAll();
-  return accounts.mao(x => basicDetails(x));
+  return accounts.map(x => basicDetails(x));
 }
 
 async function getById(id){
@@ -204,7 +204,7 @@ async function _delete(id){
 // helper functions
 
 async function getAccount(id){
-  const acocunt = await db.Account.findByPk(id);
+  const account = await db.Account.findByPk(id);
   if(!account) throw 'Account not found';
   return account;
 }
